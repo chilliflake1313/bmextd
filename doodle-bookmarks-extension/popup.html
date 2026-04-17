@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Doodle Bookmarks</title>
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+	<div class="container">
+		<!-- Header -->
+		<header class="header">
+			<h1 class="title">BookMarks</h1>
+			<div class="header-actions">
+				<button id="exportBtn" class="icon-btn" title="Export">↓</button>
+				<button id="importBtn" class="icon-btn" title="Import">↑</button>
+				<input type="file" id="importInput" accept=".json" style="display: none;">
+			</div>
+		</header>
+
+		<!-- Search -->
+		<div class="search-container">
+			<input 
+				type="text" 
+				id="searchInput" 
+				class="search-input" 
+				placeholder="Search bookmarks..."
+			>
+		</div>
+
+		<!-- Main Content -->
+		<main id="mainContent" class="main-content">
+			<!-- Sections will be rendered here -->
+		</main>
+
+		<!-- Add Section Button -->
+		<button id="addSectionBtn" class="add-section-btn">+ Add Folder</button>
+	</div>
+
+	<!-- Context Menu -->
+	<div id="contextMenu" class="context-menu hidden">
+		<div class="context-item" data-action="edit">Edit</div>
+		<div class="context-item" data-action="delete">Delete</div>
+		<div class="context-item" data-action="favorite">Toggle Favorite</div>
+	</div>
+
+	<!-- Modal for Add/Edit -->
+	<div id="modal" class="modal hidden">
+		<div class="modal-content">
+			<h2 id="modalTitle" class="modal-title">Add Bookmark</h2>
+			<form id="modalForm">
+				<input type="hidden" id="modalSectionId">
+				<input type="hidden" id="modalItemId">
+        
+				<label for="modalLabel">Label:</label>
+				<input type="text" id="modalLabel" required class="modal-input">
+        
+				<label for="modalUrl">URL:</label>
+				<input type="url" id="modalUrl" required class="modal-input">
+        
+				<div class="modal-actions">
+					<button type="submit" class="btn-primary">Save</button>
+					<button type="button" id="modalCancel" class="btn-secondary">Cancel</button>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	<!-- Modal for Section -->
+	<div id="sectionModal" class="modal hidden">
+		<div class="modal-content">
+			<h2 id="sectionModalTitle" class="modal-title">Add Folder</h2>
+			<form id="sectionModalForm">
+				<input type="hidden" id="sectionModalId">
+        
+				<label for="sectionModalName">Folder Name:</label>
+				<input type="text" id="sectionModalName" required class="modal-input">
+        
+				<div class="modal-actions">
+					<button type="submit" class="btn-primary">Save</button>
+					<button type="button" id="sectionModalCancel" class="btn-secondary">Cancel</button>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	<script src="utils.js"></script>
+	<script src="popup.js"></script>
+</body>
+</html>
