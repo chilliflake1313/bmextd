@@ -88,6 +88,7 @@ const DataUtils = {
 				id: StorageUtils.generateId(),
 				label: label,
 				url: url,
+				icon: this.getFaviconUrl(url),
 				favorite: false
 			};
 			section.items.push(newItem);
@@ -103,6 +104,7 @@ const DataUtils = {
 			if (item) {
 				item.label = label;
 				item.url = url;
+				item.icon = this.getFaviconUrl(url);
 			}
 		}
 		return data;
@@ -170,8 +172,7 @@ const DataUtils = {
 	// Get favicon URL
 	getFaviconUrl(url) {
 		try {
-			const domain = new URL(url).hostname;
-			return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+			return `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(url)}&sz=64`;
 		} catch (e) {
 			return null;
 		}
@@ -182,31 +183,140 @@ const DataUtils = {
 		return label.charAt(0).toUpperCase();
 	},
 
-	// Export data as JSON
+	// Export data as HTML bookmarks file
 	exportData(data) {
-		const dataStr = JSON.stringify(data, null, 2);
-		const blob = new Blob([dataStr], { type: 'application/json' });
+		const html = this.buildBookmarkHtml(data);
+		const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;
-		link.download = `doodle-bookmarks-${Date.now()}.json`;
+		link.download = `doodle-bookmarks-${Date.now()}.html`;
 		link.click();
 		URL.revokeObjectURL(url);
 	},
 
-	// Import data from JSON
+	buildBookmarkHtml(data) {
+		const escapeHtml = (value) => String(value)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;');
+
+		const sectionsHtml = data.sections.map((section) => {
+			const itemsHtml = section.items.map((item) => {
+				const safeLabel = escapeHtml(item.label);
+				const safeUrl = escapeHtml(item.url);
+				return `
+					<DT><A HREF="${safeUrl}">${safeLabel}</A>`;
+			}).join('\n');
+
+			return `
+			<DT><H3>${escapeHtml(section.name)}</H3>
+			<DL><p>
+			${itemsHtml}
+			</DL><p>`;
+		}).join('\n');
+
+		return `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Doodle Bookmarks</TITLE>
+<H1>Doodle Bookmarks</H1>
+<DL><p>
+${sectionsHtml}
+</DL><p>`;
+	},
+
+	parseBookmarkHtml(htmlText) {
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(htmlText, 'text/html');
+		const rootDl = doc.querySelector('dl');
+		if (!rootDl) {
+			return this.getDefaultData();
+		}
+
+		const sections = [];
+		let currentSection = null;
+
+		const normalizeImportedUrl = (value) => {
+			const trimmed = String(value || '').trim();
+			if (!trimmed) return '';
+			return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed.replace(/^www\./i, '')}`;
+		};
+
+		const rootChildren = Array.from(rootDl.children);
+		for (let index = 0; index < rootChildren.length; index += 1) {
+			const child = rootChildren[index];
+			if (child.tagName !== 'DT') continue;
+
+			const heading = child.querySelector('h3');
+			if (heading) {
+				currentSection = {
+					id: StorageUtils.generateId(),
+					name: heading.textContent.trim() || 'Imported',
+					items: []
+				};
+				sections.push(currentSection);
+
+				const nextDl = child.nextElementSibling && child.nextElementSibling.tagName === 'DL'
+					? child.nextElementSibling
+					: null;
+
+				if (nextDl) {
+					const anchors = nextDl.querySelectorAll('a');
+					anchors.forEach((anchor) => {
+						const url = normalizeImportedUrl(anchor.getAttribute('href') || anchor.href);
+						if (!url) return;
+						currentSection.items.push({
+							id: StorageUtils.generateId(),
+							label: anchor.textContent.trim() || url,
+							url,
+							icon: this.getFaviconUrl(url),
+							favorite: false
+						});
+					});
+				}
+
+				continue;
+			}
+
+			const anchor = child.querySelector('a');
+			if (anchor) {
+				if (!currentSection) {
+					currentSection = {
+						id: StorageUtils.generateId(),
+						name: 'Imported',
+						items: []
+					};
+					sections.push(currentSection);
+				}
+
+				const url = normalizeImportedUrl(anchor.getAttribute('href') || anchor.href);
+				if (!url) continue;
+
+				currentSection.items.push({
+					id: StorageUtils.generateId(),
+					label: anchor.textContent.trim() || url,
+					url,
+					icon: this.getFaviconUrl(url),
+					favorite: false
+				});
+			}
+		}
+
+		if (!sections.length) {
+			return this.getDefaultData();
+		}
+
+		return { sections };
+	},
+
+	// Import data from HTML bookmarks file
 	async importData(file) {
 		return new Promise((resolve, reject) => {
 			const reader = new FileReader();
 			reader.onload = (e) => {
 				try {
-					const data = JSON.parse(e.target.result);
-					// Validate data structure
-					if (data.sections && Array.isArray(data.sections)) {
-						resolve(data);
-					} else {
-						reject(new Error('Invalid data format'));
-					}
+					resolve(this.parseBookmarkHtml(e.target.result));
 				} catch (error) {
 					reject(error);
 				}
@@ -286,15 +396,18 @@ const KeyboardUtils = {
 	handleShortcut(action) {
 		switch (action) {
 			case 'focusSearch':
+				document.getElementById('searchContainer').classList.remove('hidden');
 				document.getElementById('searchInput').focus();
 				break;
 			case 'addSection':
-				document.getElementById('addSectionBtn').click();
+				document.getElementById('addFolderBtn').click();
 				break;
 			case 'addBookmark': {
 				const firstSection = document.querySelector('.section');
 				if (firstSection) {
 					openBookmarkModal(firstSection.dataset.sectionId);
+				} else {
+					openSectionModal();
 				}
 				break;
 			}
