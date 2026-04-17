@@ -107,19 +107,33 @@ title="${escapeHtml(item.label)}\n${escapeHtml(item.url)}">
 
 function renderSearchResults(query) {
 const mainContent = document.getElementById('mainContent');
-const results = DataUtils.searchBookmarks(currentData, query);
+const normalizedQuery = query.toLowerCase();
+const matchedSections = currentData.sections
+.map((section) => {
+const sectionMatches = section.name.toLowerCase().includes(normalizedQuery);
+const matchedItems = section.items.filter((item) => (
+item.label.toLowerCase().includes(normalizedQuery) ||
+item.url.toLowerCase().includes(normalizedQuery)
+));
 
-mainContent.innerHTML = `
-<div class="section">
-<div class="section-header">
-<h2 class="section-title">Search</h2>
-</div>
-<div class="section-divider"></div>
-<div class="bookmarks-grid">
-${results.map((item) => createBookmarkHTML(item, item.sectionId)).join('')}
-</div>
-</div>
-`;
+if (!sectionMatches && matchedItems.length === 0) return null;
+
+return {
+...section,
+items: sectionMatches ? section.items : matchedItems
+};
+})
+.filter(Boolean);
+
+mainContent.innerHTML = '';
+if (matchedSections.length === 0) {
+mainContent.innerHTML = '<div class="empty-state">No matching folders or bookmarks found.</div>';
+return;
+}
+
+matchedSections.forEach((section) => {
+mainContent.appendChild(createSectionElement(section));
+});
 
 attachBookmarkListeners();
 }
@@ -132,6 +146,7 @@ const addFolderBtn = document.getElementById('addFolderBtn');
 const importBtn = document.getElementById('importBtn');
 const exportBtn = document.getElementById('exportBtn');
 const importInput = document.getElementById('importInput');
+const mainContent = document.getElementById('mainContent');
 
 if (searchInput) {
 searchInput.addEventListener('input', debounce(() => {
@@ -175,6 +190,27 @@ await loadData();
 e.target.value = '';
 } catch (error) {
 alert('Failed to import data: ' + error.message);
+}
+});
+}
+
+if (mainContent) {
+mainContent.addEventListener('wheel', (event) => {
+if (!draggedItem) return;
+mainContent.scrollTop += event.deltaY;
+event.preventDefault();
+}, { passive: false });
+
+mainContent.addEventListener('dragover', (event) => {
+if (!draggedItem) return;
+const rect = mainContent.getBoundingClientRect();
+const edgeThreshold = 70;
+const scrollAmount = 14;
+
+if (event.clientY < rect.top + edgeThreshold) {
+mainContent.scrollTop -= scrollAmount;
+} else if (event.clientY > rect.bottom - edgeThreshold) {
+mainContent.scrollTop += scrollAmount;
 }
 });
 }

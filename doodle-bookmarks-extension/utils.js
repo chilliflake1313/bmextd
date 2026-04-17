@@ -368,7 +368,7 @@ const PerformanceUtils = {
 		const start = performance.now();
 		callback();
 		const end = performance.now();
-		console.log(`${label}: ${(end - start).toFixed(2)}ms`);
+		console.log(`${label}: ${(end  start).toFixed(2)}ms - utils.js:371`);
 	}
 };
 

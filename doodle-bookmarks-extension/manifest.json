@@ -7,6 +7,17 @@
     "storage",
     "tabs"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "save-to-default-bookmarks": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S"
+      },
+      "description": "Save current tab to default bookmarks"
+    }
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
