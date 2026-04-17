@@ -4,6 +4,7 @@ let currentContextMenu = null;
 let draggedItem = null;
 let draggedFromSection = null;
 let draggedSectionId = null;
+let showFavoritesOnly = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -31,11 +32,47 @@ function renderContent() {
 const searchInput = document.getElementById('searchInput');
 const query = searchInput ? searchInput.value.trim() : '';
 
-if (query) {
+if (showFavoritesOnly) {
+renderFavoritesOnly();
+} else if (query) {
 renderSearchResults(query);
 } else {
 renderSections();
 }
+}
+
+function renderFavoritesOnly() {
+const mainContent = document.getElementById('mainContent');
+if (!mainContent) return;
+
+const favorites = [];
+currentData.sections.forEach((section) => {
+	section.items.forEach((item) => {
+		if (item.favorite) {
+			favorites.push({ ...item, sectionId: section.id });
+		}
+	});
+});
+
+mainContent.innerHTML = '';
+if (favorites.length === 0) {
+	mainContent.innerHTML = '<div class="empty-state">No favorite bookmarks yet.</div>';
+	return;
+}
+
+mainContent.innerHTML = `
+<div class="section">
+<div class="section-header">
+<h2 class="section-title">Favorites</h2>
+</div>
+<div class="section-divider"></div>
+<div class="bookmarks-grid" data-section-id="favorites">
+${favorites.map((item) => createBookmarkHTML(item, item.sectionId)).join('')}
+</div>
+</div>
+`;
+
+attachBookmarkListeners();
 }
 
 function renderSections() {
@@ -58,10 +95,16 @@ function createSectionElement(section) {
 const sectionDiv = document.createElement('section');
 sectionDiv.className = 'section';
 sectionDiv.dataset.sectionId = section.id;
+const sectionHint = section.name === 'Quick-Save'
+? '<div class="section-hint">Ctrl + Shift + S to save page.</div>'
+: '';
 
 sectionDiv.innerHTML = `
 <div class="section-header">
+<div class="section-title-wrap">
 <h2 class="section-title" data-section-id="${section.id}">${escapeHtml(section.name)}</h2>
+${sectionHint}
+</div>
 </div>
 <div class="section-divider"></div>
 <div class="bookmarks-grid" data-section-id="${section.id}">
@@ -157,6 +200,7 @@ const searchInput = document.getElementById('searchInput');
 const searchContainer = document.getElementById('searchContainer');
 const searchToggleBtn = document.getElementById('searchToggleBtn');
 const addFolderBtn = document.getElementById('addFolderBtn');
+const favoritesToggleBtn = document.getElementById('favoritesToggleBtn');
 const themeToggleBtn = document.getElementById('themeToggleBtn');
 const importBtn = document.getElementById('importBtn');
 const exportBtn = document.getElementById('exportBtn');
@@ -183,6 +227,17 @@ renderContent();
 
 if (addFolderBtn) {
 addFolderBtn.addEventListener('click', () => openSectionModal());
+}
+
+if (favoritesToggleBtn) {
+	favoritesToggleBtn.addEventListener('click', () => {
+		showFavoritesOnly = !showFavoritesOnly;
+		favoritesToggleBtn.classList.toggle('active', showFavoritesOnly);
+		if (showFavoritesOnly && searchInput) {
+			searchInput.value = '';
+		}
+		renderContent();
+	});
 }
 
 if (themeToggleBtn) {

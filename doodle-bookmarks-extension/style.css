@@ -131,6 +131,12 @@ input {
 	background: var(--surface-hover);
 }
 
+.icon-btn.active {
+	border-color: #d94a4a;
+	color: #d94a4a;
+	background: color-mix(in srgb, var(--surface-bg) 90%, #ffdddd 10%);
+}
+
 .hidden {
 	display: none !important;
 }
@@ -206,6 +212,18 @@ input {
 	color: var(--text-color);
 }
 
+.section-title-wrap {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.section-hint {
+	font-size: 10px;
+	line-height: 1.2;
+	color: color-mix(in srgb, var(--text-color) 55%, transparent);
+}
+
 .section-divider {
 	display: none;
 }
@@ -277,9 +295,9 @@ input {
 
 .bookmark-icon,
 .bookmark-fallback {
-	width: 14px;
-	height: 14px;
-	flex: 0 0 14px;
+	width: 15px;
+	height: 15px;
+	flex: 0 0 15px;
 	border-radius: 4px;
 }
 
