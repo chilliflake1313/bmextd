@@ -316,7 +316,7 @@ ${sectionsHtml}
 		parseDl(rootDl);
 
 		if (defaultItems.length > 0) {
-			getOrCreateSection('Default Bookmarks').items.push(...defaultItems);
+			getOrCreateSection('Quick-Save').items.push(...defaultItems);
 		}
 
 		if (!sections.length) {

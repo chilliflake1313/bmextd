@@ -1,5 +1,5 @@
 const SAVE_SHORTCUT_COMMAND = 'save-to-default-bookmarks';
-const DEFAULT_SECTION_NAME = 'Default Bookmarks';
+const DEFAULT_SECTION_NAME = 'Quick-Save';
 
 chrome.commands.onCommand.addListener((command) => {
 	if (command !== SAVE_SHORTCUT_COMMAND) return;

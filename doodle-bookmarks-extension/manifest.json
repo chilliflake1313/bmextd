@@ -15,7 +15,7 @@
       "suggested_key": {
         "default": "Ctrl+Shift+S"
       },
-      "description": "Save current tab to default bookmarks"
+      "description": "Save current tab to Quick-Save"
     }
   },
   "action": {
