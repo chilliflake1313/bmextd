@@ -71,14 +71,17 @@ const titleEl = sectionDiv.querySelector('.section-title');
 const grid = sectionDiv.querySelector('.bookmarks-grid');
 
 titleEl.addEventListener('dblclick', () => openSectionModal(section.id, section.name));
-titleEl.addEventListener('contextmenu', (e) => {
+
+sectionDiv.addEventListener('contextmenu', (e) => {
+if (e.target.closest('.bookmark-item')) return;
 e.preventDefault();
-deleteSection(section.id);
+showContextMenu(e, section.id, '', 'section');
 });
 
-if (section.items.length === 0) {
-grid.addEventListener('click', () => openBookmarkModal(section.id));
-}
+grid.addEventListener('dblclick', (e) => {
+if (e.target.closest('.bookmark-item')) return;
+openBookmarkModal(section.id);
+});
 
 setupDragAndDrop(grid);
 return sectionDiv;
@@ -208,7 +211,7 @@ openBookmarkUrl(item.dataset.sectionId, item.dataset.itemId);
 
 item.addEventListener('contextmenu', (e) => {
 e.preventDefault();
-showContextMenu(e, item.dataset.sectionId, item.dataset.itemId);
+showContextMenu(e, item.dataset.sectionId, item.dataset.itemId, 'bookmark');
 });
 
 item.addEventListener('dragstart', handleDragStart);
@@ -334,9 +337,13 @@ await saveData();
 await loadData();
 }
 
-function showContextMenu(event, sectionId, itemId) {
+function showContextMenu(event, sectionId, itemId, contextType = 'bookmark') {
 const contextMenu = document.getElementById('contextMenu');
-currentContextMenu = { sectionId, itemId };
+currentContextMenu = { sectionId, itemId, contextType };
+const favoriteItem = contextMenu.querySelector('[data-action="favorite"]');
+if (favoriteItem) {
+favoriteItem.style.display = contextType === 'section' ? 'none' : '';
+}
 contextMenu.style.left = `${event.pageX}px`;
 contextMenu.style.top = `${event.pageY}px`;
 contextMenu.classList.remove('hidden');
@@ -351,13 +358,21 @@ currentContextMenu = null;
 async function handleContextMenuAction(event) {
 const actionEl = event.target.closest('.context-item');
 if (!actionEl || !currentContextMenu) return;
-const { sectionId, itemId } = currentContextMenu;
+const { sectionId, itemId, contextType } = currentContextMenu;
 
 if (actionEl.dataset.action === 'edit') {
+if (contextType === 'section') {
+openSectionModal(sectionId, currentData.sections.find((section) => section.id === sectionId)?.name || '');
+} else {
 openBookmarkModal(sectionId, itemId);
 }
+}
 if (actionEl.dataset.action === 'delete') {
-if (confirm('Delete this bookmark?')) await deleteBookmark(sectionId, itemId);
+if (contextType === 'section') {
+await deleteSection(sectionId);
+} else if (confirm('Delete this bookmark?')) {
+await deleteBookmark(sectionId, itemId);
+}
 }
 if (actionEl.dataset.action === 'favorite') {
 await toggleFavorite(sectionId, itemId);
