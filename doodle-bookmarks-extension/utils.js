@@ -216,3 +216,123 @@ const DataUtils = {
 		});
 	}
 };
+
+// Validation utilities
+const ValidationUtils = {
+	isValidUrl(url) {
+		try {
+			new URL(url.startsWith('http') ? url : 'https://' + url);
+			return true;
+		} catch {
+			return false;
+		}
+	},
+
+	sanitizeUrl(url) {
+		url = url.trim();
+		if (!/^https?:\/\//i.test(url)) {
+			url = 'https://' + url;
+		}
+		return url;
+	},
+
+	isEmptyString(str) {
+		return !str || str.trim().length === 0;
+	}
+};
+
+// Performance utilities
+const PerformanceUtils = {
+	throttle(func, limit) {
+		let inThrottle;
+		return function(...args) {
+			if (!inThrottle) {
+				func.apply(this, args);
+				inThrottle = true;
+				setTimeout(() => inThrottle = false, limit);
+			}
+		};
+	},
+
+	measureRenderTime(label, callback) {
+		const start = performance.now();
+		callback();
+		const end = performance.now();
+		console.log(`${label}: ${(end - start).toFixed(2)}ms`);
+	}
+};
+
+// Keyboard shortcuts
+const KeyboardUtils = {
+	shortcuts: {
+		'ctrl+k': 'focusSearch',
+		'ctrl+n': 'addSection',
+		'ctrl+b': 'addBookmark',
+		escape: 'closeModal'
+	},
+
+	init() {
+		document.addEventListener('keydown', (e) => {
+			const key = (e.ctrlKey || e.metaKey ? 'ctrl+' : '') + e.key.toLowerCase();
+			const action = this.shortcuts[key];
+
+			if (action) {
+				e.preventDefault();
+				this.handleShortcut(action);
+			}
+		});
+	},
+
+	handleShortcut(action) {
+		switch (action) {
+			case 'focusSearch':
+				document.getElementById('searchInput').focus();
+				break;
+			case 'addSection':
+				document.getElementById('addSectionBtn').click();
+				break;
+			case 'addBookmark': {
+				const firstSection = document.querySelector('.section');
+				if (firstSection) {
+					openBookmarkModal(firstSection.dataset.sectionId);
+				}
+				break;
+			}
+			case 'closeModal':
+				closeBookmarkModal();
+				closeSectionModal();
+				closeContextMenu();
+				break;
+		}
+	}
+};
+
+// Analytics/Statistics
+const StatsUtils = {
+	getTotalBookmarks(data) {
+		return data.sections.reduce((total, section) => total + section.items.length, 0);
+	},
+
+	getTotalFavorites(data) {
+		let count = 0;
+		data.sections.forEach(section => {
+			section.items.forEach(item => {
+				if (item.favorite) count++;
+			});
+		});
+		return count;
+	},
+
+	getMostUsedDomains(data) {
+		const domains = {};
+		data.sections.forEach(section => {
+			section.items.forEach(item => {
+				try {
+					const domain = new URL(item.url).hostname;
+					domains[domain] = (domains[domain] || 0) + 1;
+				} catch (e) {}
+			});
+		});
+		return domains;
+	}
+};

@@ -1,15 +1,20 @@
 // Global state
 let currentData = null;
 let currentContextMenu = null;
-let dragState = {
-	itemId: null,
-	fromSectionId: null
-};
+let draggedItem = null;
+let draggedFromSection = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
 	await loadData();
 	setupEventListeners();
+	KeyboardUtils.init();
+	document.getElementById('searchInput').placeholder = 'Search bookmarks... (Ctrl+K)';
+	optimizeRendering();
+});
+
+window.addEventListener('error', (e) => {
+	console.error('Extension error:', e.error);
 });
 
 // Load data and render
@@ -323,9 +328,16 @@ async function handleBookmarkFormSubmit(e) {
 	const sectionId = document.getElementById('modalSectionId').value;
 	const itemId = document.getElementById('modalItemId').value;
 	const label = document.getElementById('modalLabel').value.trim();
-	const url = document.getElementById('modalUrl').value.trim();
+	const urlInput = document.getElementById('modalUrl').value.trim();
 
-	if (!label || !url) return;
+	if (ValidationUtils.isEmptyString(label) || ValidationUtils.isEmptyString(urlInput)) return;
+
+	if (!ValidationUtils.isValidUrl(urlInput)) {
+		alert('Please enter a valid URL.');
+		return;
+	}
+
+	const url = ValidationUtils.sanitizeUrl(urlInput);
 
 	if (itemId) {
 		currentData = DataUtils.editBookmark(currentData, sectionId, itemId, label, url);
@@ -391,10 +403,12 @@ function setupDragAndDrop(grid) {
 	grid.addEventListener('dragover', (event) => {
 		event.preventDefault();
 		grid.classList.add('drag-over');
+		highlightDropZones(grid.dataset.sectionId);
 	});
 
 	grid.addEventListener('dragleave', () => {
 		grid.classList.remove('drag-over');
+		removeDropZoneHighlights();
 	});
 
 	grid.addEventListener('drop', async (event) => {
@@ -402,11 +416,11 @@ function setupDragAndDrop(grid) {
 		grid.classList.remove('drag-over');
 
 		const targetSectionId = grid.dataset.sectionId;
-		if (!dragState.itemId || !dragState.fromSectionId || dragState.fromSectionId === targetSectionId) {
+		if (!draggedItem || !draggedFromSection || draggedFromSection === targetSectionId) {
 			return;
 		}
 
-		currentData = DataUtils.moveBookmark(currentData, dragState.itemId, dragState.fromSectionId, targetSectionId);
+		currentData = DataUtils.moveBookmark(currentData, draggedItem.dataset.itemId, draggedFromSection, targetSectionId);
 		await saveData();
 		await loadData();
 	});
@@ -414,20 +428,45 @@ function setupDragAndDrop(grid) {
 
 function handleDragStart(event) {
 	const item = event.currentTarget;
-	dragState = {
-		itemId: item.dataset.itemId,
-		fromSectionId: item.dataset.sectionId
-	};
+	draggedItem = item;
+	draggedFromSection = item.dataset.sectionId;
+	item.classList.add('dragging');
+	item.style.opacity = '0.5';
 	event.dataTransfer.effectAllowed = 'move';
+	event.dataTransfer.setData('text/html', item.innerHTML);
+
+	const dragImage = item.cloneNode(true);
+	dragImage.style.opacity = '0.8';
+	dragImage.style.transform = 'rotate(-5deg)';
+	document.body.appendChild(dragImage);
+	dragImage.style.position = 'absolute';
+	dragImage.style.top = '-1000px';
+	event.dataTransfer.setDragImage(dragImage, 30, 30);
+	setTimeout(() => dragImage.remove(), 0);
 }
 
-function handleDragEnd() {
-	dragState = {
-		itemId: null,
-		fromSectionId: null
-	};
+function handleDragEnd(event) {
+	event.currentTarget.classList.remove('dragging');
+	event.currentTarget.style.opacity = '1';
 	document.querySelectorAll('.bookmarks-grid').forEach(grid => {
 		grid.classList.remove('drag-over');
+	});
+	removeDropZoneHighlights();
+	draggedItem = null;
+	draggedFromSection = null;
+}
+
+function highlightDropZones(currentSectionId) {
+	document.querySelectorAll('.bookmarks-grid').forEach(grid => {
+		if (grid.dataset.sectionId !== currentSectionId) {
+			grid.style.borderColor = '#4a90e2';
+		}
+	});
+}
+
+function removeDropZoneHighlights() {
+	document.querySelectorAll('.bookmarks-grid').forEach(grid => {
+		grid.style.borderColor = '';
 	});
 }
 
@@ -444,4 +483,20 @@ function debounce(fn, wait) {
 		clearTimeout(timeoutId);
 		timeoutId = setTimeout(() => fn(...args), wait);
 	};
+}
+
+function showStats() {
+	const total = StatsUtils.getTotalBookmarks(currentData);
+	const favorites = StatsUtils.getTotalFavorites(currentData);
+	const sections = currentData.sections.length;
+
+	alert(`📊 Statistics:\n\nFolders: ${sections}\nBookmarks: ${total}\nFavorites: ${favorites}`);
+}
+
+function optimizeRendering() {
+	const totalItems = StatsUtils.getTotalBookmarks(currentData);
+
+	if (totalItems > 100) {
+		console.log('Large dataset detected, optimizing rendering...');
+	}
 }
