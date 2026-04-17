@@ -231,11 +231,8 @@ ${sectionsHtml}
 		const doc = parser.parseFromString(htmlText, 'text/html');
 		const rootDl = doc.querySelector('dl');
 		if (!rootDl) {
-			return this.getDefaultData();
+			return StorageUtils.getDefaultData();
 		}
-
-		const sections = [];
-		let currentSection = null;
 
 		const normalizeImportedUrl = (value) => {
 			const trimmed = String(value || '').trim();
@@ -243,68 +240,87 @@ ${sectionsHtml}
 			return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed.replace(/^www\./i, '')}`;
 		};
 
-		const rootChildren = Array.from(rootDl.children);
-		for (let index = 0; index < rootChildren.length; index += 1) {
-			const child = rootChildren[index];
-			if (child.tagName !== 'DT') continue;
+		const sections = [];
+		const defaultItems = [];
+		const seenUrls = new Set();
 
-			const heading = child.querySelector('h3');
-			if (heading) {
-				currentSection = {
+		const getOrCreateSection = (name) => {
+			let section = sections.find((entry) => entry.name === name);
+			if (!section) {
+				section = {
 					id: StorageUtils.generateId(),
-					name: heading.textContent.trim() || 'Imported',
+					name,
 					items: []
 				};
-				sections.push(currentSection);
+				sections.push(section);
+			}
+			return section;
+		};
 
-				const nextDl = child.nextElementSibling && child.nextElementSibling.tagName === 'DL'
-					? child.nextElementSibling
-					: null;
+		const createBookmarkItem = (anchor) => {
+			const url = normalizeImportedUrl(anchor.getAttribute('href') || anchor.href);
+			if (!url || seenUrls.has(url)) return null;
+			seenUrls.add(url);
 
-				if (nextDl) {
-					const anchors = nextDl.querySelectorAll('a');
-					anchors.forEach((anchor) => {
-						const url = normalizeImportedUrl(anchor.getAttribute('href') || anchor.href);
-						if (!url) return;
-						currentSection.items.push({
-							id: StorageUtils.generateId(),
-							label: anchor.textContent.trim() || url,
-							url,
-							icon: this.getFaviconUrl(url),
-							favorite: false
-						});
-					});
+			return {
+				id: StorageUtils.generateId(),
+				label: anchor.textContent.trim() || url,
+				url,
+				icon: this.getFaviconUrl(url),
+				favorite: false
+			};
+		};
+
+		const parseDl = (dlElement, parentPath = '') => {
+			const children = Array.from(dlElement.children);
+			for (let i = 0; i < children.length; i += 1) {
+				const child = children[i];
+				if (child.tagName !== 'DT') continue;
+
+				const directChildren = Array.from(child.children);
+				const headingEl = directChildren.find((entry) => entry.tagName === 'H3');
+				const anchorEl = child.querySelector('a[href]');
+
+				if (headingEl) {
+					const folderName = headingEl.textContent.trim() || 'Imported';
+					const folderPath = parentPath ? `${parentPath} / ${folderName}` : folderName;
+					getOrCreateSection(folderPath);
+
+					let nestedDl = directChildren.find((entry) => entry.tagName === 'DL') || null;
+					if (!nestedDl) {
+						nestedDl = child.nextElementSibling;
+						while (nestedDl && nestedDl.tagName === 'P') {
+							nestedDl = nestedDl.nextElementSibling;
+						}
+					}
+
+					if (nestedDl && nestedDl.tagName === 'DL') {
+						parseDl(nestedDl, folderPath);
+					}
+					continue;
 				}
 
-				continue;
-			}
+				if (anchorEl) {
+					const item = createBookmarkItem(anchorEl);
+					if (!item) continue;
 
-			const anchor = child.querySelector('a');
-			if (anchor) {
-				if (!currentSection) {
-					currentSection = {
-						id: StorageUtils.generateId(),
-						name: 'Imported',
-						items: []
-					};
-					sections.push(currentSection);
+					if (parentPath) {
+						getOrCreateSection(parentPath).items.push(item);
+					} else {
+						defaultItems.push(item);
+					}
 				}
-
-				const url = normalizeImportedUrl(anchor.getAttribute('href') || anchor.href);
-				if (!url) continue;
-
-				currentSection.items.push({
-					id: StorageUtils.generateId(),
-					label: anchor.textContent.trim() || url,
-					url,
-					icon: this.getFaviconUrl(url),
-					favorite: false
-				});
 			}
+		};
+
+		parseDl(rootDl);
+
+		if (defaultItems.length > 0) {
+			getOrCreateSection('Default Bookmarks').items.push(...defaultItems);
 		}
 
 		if (!sections.length) {
-			return this.getDefaultData();
+			return StorageUtils.getDefaultData();
 		}
 
 		return { sections };
@@ -368,7 +384,7 @@ const PerformanceUtils = {
 		const start = performance.now();
 		callback();
 		const end = performance.now();
-		console.log(`${label}: ${(end  start).toFixed(2)}ms - utils.js:371`);
+		console.log(`${label}: ${(end - start).toFixed(2)}ms - utils.js:371`);
 	}
 };
 
