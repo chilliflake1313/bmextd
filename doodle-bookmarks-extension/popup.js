@@ -3,9 +3,11 @@ let currentData = null;
 let currentContextMenu = null;
 let draggedItem = null;
 let draggedFromSection = null;
+let draggedSectionId = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+applySavedTheme();
 await loadData();
 setupEventListeners();
 KeyboardUtils.init();
@@ -13,7 +15,7 @@ optimizeRendering();
 });
 
 window.addEventListener('error', (e) => {
-console.error('Extension error:', e.error);
+console.error('Extension error: - popup.js:17', e.error);
 });
 
 async function loadData() {
@@ -69,8 +71,20 @@ ${section.items.map((item) => createBookmarkHTML(item, section.id)).join('')}
 
 const titleEl = sectionDiv.querySelector('.section-title');
 const grid = sectionDiv.querySelector('.bookmarks-grid');
+const headerEl = sectionDiv.querySelector('.section-header');
 
 titleEl.addEventListener('dblclick', () => openSectionModal(section.id, section.name));
+
+if (headerEl) {
+headerEl.setAttribute('draggable', 'true');
+headerEl.classList.add('section-draggable');
+headerEl.addEventListener('dragstart', handleSectionDragStart);
+headerEl.addEventListener('dragend', handleSectionDragEnd);
+}
+
+sectionDiv.addEventListener('dragover', handleSectionDragOver);
+sectionDiv.addEventListener('dragleave', handleSectionDragLeave);
+sectionDiv.addEventListener('drop', handleSectionDrop);
 
 sectionDiv.addEventListener('contextmenu', (e) => {
 if (e.target.closest('.bookmark-item')) return;
@@ -143,6 +157,7 @@ const searchInput = document.getElementById('searchInput');
 const searchContainer = document.getElementById('searchContainer');
 const searchToggleBtn = document.getElementById('searchToggleBtn');
 const addFolderBtn = document.getElementById('addFolderBtn');
+const themeToggleBtn = document.getElementById('themeToggleBtn');
 const importBtn = document.getElementById('importBtn');
 const exportBtn = document.getElementById('exportBtn');
 const importInput = document.getElementById('importInput');
@@ -168,6 +183,10 @@ renderContent();
 
 if (addFolderBtn) {
 addFolderBtn.addEventListener('click', () => openSectionModal());
+}
+
+if (themeToggleBtn) {
+	themeToggleBtn.addEventListener('click', toggleTheme);
 }
 
 if (exportBtn) {
@@ -196,13 +215,13 @@ alert('Failed to import data: ' + error.message);
 
 if (mainContent) {
 mainContent.addEventListener('wheel', (event) => {
-if (!draggedItem) return;
+if (!draggedItem && !draggedSectionId) return;
 mainContent.scrollTop += event.deltaY;
 event.preventDefault();
 }, { passive: false });
 
 mainContent.addEventListener('dragover', (event) => {
-if (!draggedItem) return;
+if (!draggedItem && !draggedSectionId) return;
 const rect = mainContent.getBoundingClientRect();
 const edgeThreshold = 70;
 const scrollAmount = 14;
@@ -380,9 +399,16 @@ const favoriteItem = contextMenu.querySelector('[data-action="favorite"]');
 if (favoriteItem) {
 favoriteItem.style.display = contextType === 'section' ? 'none' : '';
 }
-contextMenu.style.left = `${event.pageX}px`;
-contextMenu.style.top = `${event.pageY}px`;
 contextMenu.classList.remove('hidden');
+
+const margin = 8;
+const menuRect = contextMenu.getBoundingClientRect();
+const maxLeft = window.innerWidth - menuRect.width - margin;
+const maxTop = window.innerHeight - menuRect.height - margin;
+const left = Math.max(margin, Math.min(event.clientX, maxLeft));
+const top = Math.max(margin, Math.min(event.clientY, maxTop));
+contextMenu.style.left = `${left}px`;
+contextMenu.style.top = `${top}px`;
 }
 
 function closeContextMenu() {
@@ -470,6 +496,67 @@ draggedItem = null;
 draggedFromSection = null;
 }
 
+function handleSectionDragStart(event) {
+const sectionEl = event.currentTarget.closest('.section');
+if (!sectionEl) return;
+
+draggedSectionId = sectionEl.dataset.sectionId;
+sectionEl.classList.add('section-dragging');
+event.dataTransfer.effectAllowed = 'move';
+}
+
+function handleSectionDragEnd(event) {
+const sectionEl = event.currentTarget.closest('.section');
+if (sectionEl) {
+	sectionEl.classList.remove('section-dragging');
+}
+
+document.querySelectorAll('.section').forEach((section) => {
+	section.classList.remove('section-drag-over');
+});
+
+draggedSectionId = null;
+}
+
+function handleSectionDragOver(event) {
+if (!draggedSectionId) return;
+
+const sectionEl = event.currentTarget;
+if (!sectionEl || sectionEl.dataset.sectionId === draggedSectionId) return;
+
+event.preventDefault();
+sectionEl.classList.add('section-drag-over');
+}
+
+function handleSectionDragLeave(event) {
+const sectionEl = event.currentTarget;
+if (sectionEl) {
+	sectionEl.classList.remove('section-drag-over');
+}
+}
+
+async function handleSectionDrop(event) {
+if (!draggedSectionId) return;
+
+event.preventDefault();
+const targetSectionEl = event.currentTarget;
+if (!targetSectionEl) return;
+
+targetSectionEl.classList.remove('section-drag-over');
+const targetSectionId = targetSectionEl.dataset.sectionId;
+if (!targetSectionId || targetSectionId === draggedSectionId) return;
+
+const fromIndex = currentData.sections.findIndex((section) => section.id === draggedSectionId);
+const toIndex = currentData.sections.findIndex((section) => section.id === targetSectionId);
+if (fromIndex === -1 || toIndex === -1) return;
+
+const [movedSection] = currentData.sections.splice(fromIndex, 1);
+currentData.sections.splice(toIndex, 0, movedSection);
+
+await saveData();
+await loadData();
+}
+
 function escapeHtml(text) {
 const div = document.createElement('div');
 div.textContent = text;
@@ -487,6 +574,37 @@ timeoutId = setTimeout(() => fn(...args), wait);
 function optimizeRendering() {
 const totalItems = StatsUtils.getTotalBookmarks(currentData);
 if (totalItems > 100) {
-console.log('Large dataset detected, optimizing rendering...');
+console.log('Large dataset detected, optimizing rendering... - popup.js:496');
+}
+}
+
+function applySavedTheme() {
+const savedTheme = localStorage.getItem('bmextd-theme') || 'light';
+document.body.dataset.theme = savedTheme;
+syncThemeButton(savedTheme);
+}
+
+function toggleTheme() {
+const nextTheme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+document.body.dataset.theme = nextTheme;
+localStorage.setItem('bmextd-theme', nextTheme);
+syncThemeButton(nextTheme);
+}
+
+function syncThemeButton(theme) {
+const button = document.getElementById('themeToggleBtn');
+if (!button) return;
+
+const sunIcon = button.querySelector('.icon-sun');
+const moonIcon = button.querySelector('.icon-moon');
+
+if (sunIcon && moonIcon) {
+	if (theme === 'dark') {
+		sunIcon.classList.add('hidden');
+		moonIcon.classList.remove('hidden');
+	} else {
+		sunIcon.classList.remove('hidden');
+		moonIcon.classList.add('hidden');
+	}
 }
 }
