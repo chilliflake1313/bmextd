@@ -16,7 +16,7 @@ optimizeRendering();
 });
 
 window.addEventListener('error', (e) => {
-console.error('Extension error: - popup.js:17', e.error);
+console.error('Extension error: - popup.js:19', e.error);
 });
 
 async function loadData() {
@@ -146,7 +146,8 @@ return sectionDiv;
 
 function createBookmarkHTML(item, sectionId) {
 const faviconUrl = item.icon || DataUtils.getFaviconUrl(item.url);
-const fallbackLetter = DataUtils.getFirstLetter(item.label);
+const cleanName = String(item.label || '').trim() || getSiteName(item.url);
+const fallbackLetter = DataUtils.getFirstLetter(cleanName);
 const favoriteClass = item.favorite ? 'favorite' : '';
 
 return `
@@ -154,10 +155,10 @@ return `
 draggable="true"
 data-item-id="${item.id}"
 data-section-id="${sectionId}"
-title="${escapeHtml(item.label)}\n${escapeHtml(item.url)}">
+title="${escapeHtml(cleanName)}\n${escapeHtml(item.url)}">
 <img src="${escapeHtml(faviconUrl)}" class="bookmark-icon" alt="">
 <span class="bookmark-fallback">${escapeHtml(fallbackLetter)}</span>
-<span class="bookmark-label">${escapeHtml(item.label)}</span>
+<span class="bookmark-label">${escapeHtml(cleanName)}</span>
 </div>
 `;
 }
@@ -170,6 +171,7 @@ const matchedSections = currentData.sections
 const sectionMatches = section.name.toLowerCase().includes(normalizedQuery);
 const matchedItems = section.items.filter((item) => (
 item.label.toLowerCase().includes(normalizedQuery) ||
+getSiteName(item.url).toLowerCase().includes(normalizedQuery) ||
 item.url.toLowerCase().includes(normalizedQuery)
 ));
 
@@ -193,6 +195,32 @@ mainContent.appendChild(createSectionElement(section));
 });
 
 attachBookmarkListeners();
+}
+
+function getSiteName(url) {
+try {
+const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+const parts = hostname.split('.').filter(Boolean);
+if (parts.length <= 1) return parts[0] || 'link';
+
+const multiPartSuffixes = new Set([
+ 'co.uk', 'org.uk', 'gov.uk', 'ac.uk',
+ 'co.in', 'com.in', 'org.in', 'net.in', 'edu.in', 'gov.in', 'ac.in', 'res.in', 'nic.in', 'firm.in', 'gen.in', 'ind.in',
+ 'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au',
+ 'co.nz', 'com.br', 'net.br', 'org.br',
+ 'com.sg', 'com.my', 'com.ph',
+ 'co.jp', 'ne.jp', 'or.jp', 'go.jp'
+]);
+
+const suffix = parts.slice(-2).join('.');
+if (multiPartSuffixes.has(suffix) && parts.length >= 3) {
+ return parts[parts.length - 3] || 'link';
+}
+
+return parts[parts.length - 2] || 'link';
+} catch (error) {
+return 'link';
+}
 }
 
 function setupEventListeners() {
@@ -629,7 +657,7 @@ timeoutId = setTimeout(() => fn(...args), wait);
 function optimizeRendering() {
 const totalItems = StatsUtils.getTotalBookmarks(currentData);
 if (totalItems > 100) {
-console.log('Large dataset detected, optimizing rendering... - popup.js:496');
+console.log('Large dataset detected, optimizing rendering... - popup.js:660');
 }
 }
 

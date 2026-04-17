@@ -241,7 +241,7 @@ input {
 .bookmarks-grid {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
-	gap: 6px;
+	gap: 10px;
 	align-items: stretch;
 	min-height: 36px;
 }
@@ -257,14 +257,15 @@ input {
 	height: 34px;
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 0 8px;
+	gap: 4px;
+	padding: 4px 8px;
 	border: 1px solid var(--grid-border);
-	border-radius: 9px;
+	border-radius: 12px;
 	background: var(--surface-bg);
 	cursor: pointer;
 	transition: background 0.15s ease, transform 0.15s ease;
 	overflow: hidden;
+	min-width: 0;
 }
 
 .bookmark-item:hover {
@@ -311,14 +312,21 @@ input {
 }
 
 .bookmark-label {
-	display: inline-flex;
-	align-items: center;
-	font-size: 14px;
+	display: block;
+	flex: 1;
+	min-width: 0;
+	max-width: 100%;
+	font-size: 12px;
 	line-height: 1;
 	color: var(--text-color);
 	white-space: nowrap;
 	overflow: hidden;
-	text-overflow: ellipsis;
+	text-overflow: clip;
+}
+
+.bookmark-item > .bookmark-label {
+	flex: 1;
+	min-width: 0;
 }
 
 .bookmark-item.favorite .bookmark-label {

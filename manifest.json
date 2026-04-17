@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Doodle Bookmarks",
+  "name": "bmextd",
   "version": "1.0.0",
-  "description": "Hand-drawn style bookmark manager with Excalidraw aesthetics",
+  "description": "A simple bookmark tool.",
   "permissions": [
     "storage",
     "tabs"
   ],
   "background": {
-    "service_worker": "doodle-bookmarks-extension/background.js"
+    "service_worker": "bmextd/background.js"
   },
   "commands": {
     "save-to-default-bookmarks": {
@@ -19,16 +19,16 @@
     }
   },
   "action": {
-    "default_popup": "doodle-bookmarks-extension/popup.html",
+    "default_popup": "bmextd/popup.html",
     "default_icon": {
-      "16": "doodle-bookmarks-extension/icons/icon16.png",
-      "48": "doodle-bookmarks-extension/icons/icon48.png",
-      "128": "doodle-bookmarks-extension/icons/icon128.png"
+      "16": "bmextd/icons/icon16.png",
+      "48": "bmextd/icons/icon48.png",
+      "128": "bmextd/icons/icon128.png"
     }
   },
   "icons": {
-    "16": "doodle-bookmarks-extension/icons/icon16.png",
-    "48": "doodle-bookmarks-extension/icons/icon48.png",
-    "128": "doodle-bookmarks-extension/icons/icon128.png"
+    "16": "bmextd/icons/icon16.png",
+    "48": "bmextd/icons/icon48.png",
+    "128": "bmextd/icons/icon128.png"
   }
 }

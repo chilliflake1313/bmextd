@@ -5,20 +5,7 @@ const StorageUtils = {
 		return new Promise((resolve) => {
 			chrome.storage.local.get(['bookmarksData'], (result) => {
 				if (result.bookmarksData) {
-					const data = result.bookmarksData;
-					const legacyNames = ['Life', 'Social', 'Work'];
-					const sections = Array.isArray(data.sections) ? data.sections : [];
-					const onlyLegacyEmptySections = sections.length > 0 && sections.every((section) => (
-						legacyNames.includes(section.name) && (!section.items || section.items.length === 0)
-					));
-
-					if (onlyLegacyEmptySections) {
-						data.sections = [];
-						chrome.storage.local.set({ bookmarksData: data }, () => resolve(data));
-						return;
-					}
-
-					resolve(data);
+					resolve(result.bookmarksData);
 				} else {
 					// Return default data structure
 					resolve(this.getDefaultData());
@@ -187,7 +174,7 @@ const DataUtils = {
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;
-		link.download = `bmextd-${Date.now()}.html`;
+		link.download = `doodle-bookmarks-${Date.now()}.html`;
 		link.click();
 		URL.revokeObjectURL(url);
 	},
@@ -216,8 +203,8 @@ const DataUtils = {
 
 		return `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
-<TITLE>bmextd</TITLE>
-<H1>bmextd</H1>
+<TITLE>Doodle Bookmarks</TITLE>
+<H1>Doodle Bookmarks</H1>
 <DL><p>
 ${sectionsHtml}
 </DL><p>`;
@@ -381,7 +368,7 @@ const PerformanceUtils = {
 		const start = performance.now();
 		callback();
 		const end = performance.now();
-		console.log(`${label}: ${(end - start).toFixed(2)}ms - utils.js:384`);
+		console.log(`${label}: ${(end - start).toFixed(2)}ms - utils.js:371`);
 	}
 };
 
@@ -462,3 +449,4 @@ const StatsUtils = {
 		return domains;
 	}
 };
+
