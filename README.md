@@ -21,6 +21,10 @@ How to remove/unload:
 
 ## Features
 
+https://github.com/user-attachments/assets/3cc8276e-2cc3-424c-9c1c-859dce23341b
+
+
+
 - Create folders (sections) for bookmarks.
 - Add, edit, and delete bookmarks.
 - Open bookmarks in a new tab.
