@@ -15,7 +15,8 @@
       "suggested_key": {
         "default": "Ctrl+Shift+X"
       },
-      "description": "Save current tab to Quick-Save"
+      "description": "Save current tab to Quick-Save",
+      "default_title": "Save to Quick-Save"
     }
   },
   "action": {
