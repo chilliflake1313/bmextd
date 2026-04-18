@@ -96,7 +96,7 @@ const sectionDiv = document.createElement('section');
 sectionDiv.className = 'section';
 sectionDiv.dataset.sectionId = section.id;
 const sectionHint = section.name === 'Quick-Save'
-? '<div class="section-hint">Ctrl + Shift + S to save page.</div>'
+? '<div class="section-hint">Ctrl + Shift + X to save page.</div>'
 : '';
 
 sectionDiv.innerHTML = `

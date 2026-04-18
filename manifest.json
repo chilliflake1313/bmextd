@@ -13,7 +13,7 @@
   "commands": {
     "save-to-default-bookmarks": {
       "suggested_key": {
-        "default": "Ctrl+Shift+S"
+        "default": "Ctrl+Shift+X"
       },
       "description": "Save current tab to Quick-Save"
     }
