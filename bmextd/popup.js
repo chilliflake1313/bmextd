@@ -18,7 +18,7 @@ optimizeRendering();
 });
 
 window.addEventListener('error', (e) => {
-console.error('Extension error: - popup.js:19', e.error);
+console.error('Extension error: - popup.js:21', e.error);
 });
 
 async function loadData() {
@@ -305,10 +305,7 @@ importInput.addEventListener('change', async (e) => {
 const file = e.target.files[0];
 if (!file) return;
 try {
-const importedData = await DataUtils.importData(file);
-const latestData = await getLatestBookmarksFromStorage();
-const mergedData = DataUtils.mergeImportedData(latestData, importedData);
-currentData = mergedData;
+currentData = await DataUtils.importData(file);
 await saveData();
 await loadData();
 e.target.value = '';
@@ -316,25 +313,6 @@ e.target.value = '';
 alert('Failed to import data: ' + error.message);
 }
 });
-}
-
-function getLatestBookmarksFromStorage() {
-	return new Promise((resolve, reject) => {
-		chrome.storage.local.get(['bookmarksData'], (result) => {
-			if (chrome.runtime.lastError) {
-				reject(new Error(chrome.runtime.lastError.message));
-				return;
-			}
-
-			const storedData = result.bookmarksData;
-			if (!storedData || !Array.isArray(storedData.sections)) {
-				resolve({ sections: [] });
-				return;
-			}
-
-			resolve(storedData);
-		});
-	});
 }
 
 if (mainContent) {
@@ -698,7 +676,7 @@ timeoutId = setTimeout(() => fn(...args), wait);
 function optimizeRendering() {
 const totalItems = StatsUtils.getTotalBookmarks(currentData);
 if (totalItems > 100) {
-console.log('Large dataset detected, optimizing rendering... - popup.js:660');
+console.log('Large dataset detected, optimizing rendering... - popup.js:679');
 }
 }
 
