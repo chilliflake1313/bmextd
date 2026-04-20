@@ -306,25 +306,35 @@ const file = e.target.files[0];
 if (!file) return;
 try {
 const beforeCount = currentData?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
-console.log('[bmextd] Import: bookmarks before =', beforeCount, currentData);
+console.log('[bmextd] Import HANDLER: currentData at start has', beforeCount, 'bookmarks');
+console.log('[bmextd] Import HANDLER: currentData sections:', currentData?.sections?.map(s => ({ name: s.name, items: s.items?.length || 0 })));
 
+console.log('[bmextd] Import HANDLER: Calling DataUtils.importData...');
 const merged = await DataUtils.importData(file);
 const importedCount = merged?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
-console.log('[bmextd] Import: merged result count =', importedCount, merged);
+console.log('[bmextd] Import HANDLER: importData returned merged with', importedCount, 'bookmarks');
+console.log('[bmextd] Import HANDLER: merged sections:', merged?.sections?.map(s => ({ name: s.name, items: s.items?.length || 0 })));
 
 currentData = merged;
+console.log('[bmextd] Import HANDLER: Setting currentData = merged');
+
+console.log('[bmextd] Import HANDLER: Calling saveData...');
 await saveData();
+console.log('[bmextd] Import HANDLER: saveData complete');
+
+console.log('[bmextd] Import HANDLER: Calling loadData...');
 await loadData();
+console.log('[bmextd] Import HANDLER: loadData complete');
 
 const afterCount = currentData?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
-console.log('[bmextd] Import: bookmarks after =', afterCount, currentData);
+console.log('[bmextd] Import HANDLER: After reload, currentData has', afterCount, 'bookmarks');
 
 alert(`Import complete: Before=${beforeCount}, After=${afterCount}, Imported=${importedCount}`);
 
 e.target.value = '';
 } catch (error) {
 alert('Failed to import data: ' + error.message);
-console.error('[bmextd] Import error:', error);
+console.error('[bmextd] Import error: - popup.js:327', error);
 }
 });
 }
@@ -690,7 +700,7 @@ timeoutId = setTimeout(() => fn(...args), wait);
 function optimizeRendering() {
 const totalItems = StatsUtils.getTotalBookmarks(currentData);
 if (totalItems > 100) {
-console.log('Large dataset detected, optimizing rendering... - popup.js:679');
+console.log('Large dataset detected, optimizing rendering... - popup.js:693');
 }
 }
 
