@@ -305,12 +305,26 @@ importInput.addEventListener('change', async (e) => {
 const file = e.target.files[0];
 if (!file) return;
 try {
-currentData = await DataUtils.importData(file);
+const beforeCount = currentData?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
+console.log('[bmextd] Import: bookmarks before =', beforeCount, currentData);
+
+const merged = await DataUtils.importData(file);
+const importedCount = merged?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
+console.log('[bmextd] Import: merged result count =', importedCount, merged);
+
+currentData = merged;
 await saveData();
 await loadData();
+
+const afterCount = currentData?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
+console.log('[bmextd] Import: bookmarks after =', afterCount, currentData);
+
+alert(`Import complete: Before=${beforeCount}, After=${afterCount}, Imported=${importedCount}`);
+
 e.target.value = '';
 } catch (error) {
 alert('Failed to import data: ' + error.message);
+console.error('[bmextd] Import error:', error);
 }
 });
 }
