@@ -5,11 +5,13 @@ let draggedItem = null;
 let draggedFromSection = null;
 let draggedSectionId = null;
 let showFavoritesOnly = false;
+let popupSaveQueue = Promise.resolve();
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
 applySavedTheme();
 await loadData();
+setupStorageSync();
 setupEventListeners();
 KeyboardUtils.init();
 optimizeRendering();
@@ -21,11 +23,29 @@ console.error('Extension error: - popup.js:19', e.error);
 
 async function loadData() {
 currentData = await StorageUtils.getData();
+if (!currentData || !Array.isArray(currentData.sections)) {
+	currentData = { sections: [] };
+}
 renderContent();
 }
 
 async function saveData() {
-await StorageUtils.saveData(currentData);
+	const snapshot = JSON.parse(JSON.stringify(currentData || { sections: [] }));
+	popupSaveQueue = popupSaveQueue.then(() => StorageUtils.saveData(snapshot));
+	await popupSaveQueue;
+}
+
+function setupStorageSync() {
+	chrome.storage.onChanged.addListener((changes, areaName) => {
+		if (areaName !== 'local' || !changes.bookmarksData) return;
+
+		const latest = changes.bookmarksData.newValue;
+		currentData = latest && Array.isArray(latest.sections)
+			? latest
+			: { sections: [] };
+
+		renderContent();
+	});
 }
 
 function renderContent() {
@@ -285,8 +305,10 @@ importInput.addEventListener('change', async (e) => {
 const file = e.target.files[0];
 if (!file) return;
 try {
-const data = await DataUtils.importData(file);
-currentData = data;
+const importedData = await DataUtils.importData(file);
+const latestData = await getLatestBookmarksFromStorage();
+const mergedData = DataUtils.mergeImportedData(latestData, importedData);
+currentData = mergedData;
 await saveData();
 await loadData();
 e.target.value = '';
@@ -294,6 +316,25 @@ e.target.value = '';
 alert('Failed to import data: ' + error.message);
 }
 });
+}
+
+function getLatestBookmarksFromStorage() {
+	return new Promise((resolve, reject) => {
+		chrome.storage.local.get(['bookmarksData'], (result) => {
+			if (chrome.runtime.lastError) {
+				reject(new Error(chrome.runtime.lastError.message));
+				return;
+			}
+
+			const storedData = result.bookmarksData;
+			if (!storedData || !Array.isArray(storedData.sections)) {
+				resolve({ sections: [] });
+				return;
+			}
+
+			resolve(storedData);
+		});
+	});
 }
 
 if (mainContent) {
