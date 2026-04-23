@@ -2,7 +2,7 @@ const SAVE_SHORTCUT_COMMAND = 'save-to-default-bookmarks';
 const DEFAULT_SECTION_NAME = 'Quick-Save';
 let saveQueue = Promise.resolve();
 
-chrome.commands.onCommand.addListener((command) => {
+chrome.commands.onCommand.addListener(async (command) => {
 	console.log('[bmextd] Command received: - background.js:6', command);
 	if (command !== SAVE_SHORTCUT_COMMAND) return;
 
@@ -11,27 +11,42 @@ chrome.commands.onCommand.addListener((command) => {
 		.catch((error) => {
 			console.error('[bmextd] Shortcut save failed - background.js:12', error);
 		});
+
+	await saveQueue;
 });
 
 async function saveCurrentActiveTab() {
 	const activeTab = await findBestActiveTab();
 	if (!activeTab) {
-		console.warn('[bmextd] No active tabs found - background.js:19');
+		console.warn('[bmextd] No active tabs found - background.js:21');
 		return;
 	}
 
 	const url = activeTab.url || activeTab.pendingUrl;
 	if (!url) {
-		console.warn('[bmextd] Active tab has no URL or pending URL - background.js:25');
+		console.warn('[bmextd] Active tab has no URL or pending URL - background.js:27');
+		return;
+	}
+
+	if (!isBookmarkableUrl(url)) {
+		console.warn('[bmextd] Skipping nonbookmarkable URL - background.js:32', url);
 		return;
 	}
 
 	const title = (activeTab.title && activeTab.title.trim()) || url;
-	console.log('[bmextd] Saving bookmark: - background.js:30', { title, url });
+	console.log('[bmextd] Saving bookmark: - background.js:37', { title, url });
 	await addBookmarkToSection(url, title, DEFAULT_SECTION_NAME);
 }
 
 async function findBestActiveTab() {
+	const focused = await getLastFocusedWindow();
+	if (focused && typeof focused.id === 'number') {
+		const focusedTabs = await queryTabs({ active: true, windowId: focused.id });
+		if (focusedTabs.length > 0) {
+			return focusedTabs[0];
+		}
+	}
+
 	const currentWindowTabs = await queryTabs({ active: true, currentWindow: true });
 	if (currentWindowTabs.length > 0) {
 		return currentWindowTabs[0];
@@ -50,11 +65,24 @@ async function findBestActiveTab() {
 	return null;
 }
 
+function getLastFocusedWindow() {
+	return new Promise((resolve) => {
+		chrome.windows.getLastFocused({ populate: false }, (windowInfo) => {
+			if (chrome.runtime.lastError) {
+				resolve(null);
+				return;
+			}
+
+			resolve(windowInfo || null);
+		});
+	});
+}
+
 function queryTabs(queryInfo) {
 	return new Promise((resolve) => {
 		chrome.tabs.query(queryInfo, (tabs) => {
 			if (chrome.runtime.lastError) {
-				console.warn('[bmextd] tabs.query failed - background.js:57', chrome.runtime.lastError.message);
+				console.warn('[bmextd] tabs.query failed - background.js:85', chrome.runtime.lastError.message);
 				resolve([]);
 				return;
 			}
@@ -93,6 +121,14 @@ function addBookmarkToSection(url, title, sectionName) {
 					targetSection.items = [];
 				}
 
+				const normalizedUrl = normalizeUrl(url);
+				const alreadyExists = targetSection.items.some((item) => normalizeUrl(item && item.url) === normalizedUrl);
+				if (alreadyExists) {
+					console.log('[bmextd] Bookmark already exists in QuickSave - background.js:127', url);
+					resolve();
+					return;
+				}
+
 				targetSection.items.push({
 					id: generateId(),
 					label: title || url,
@@ -107,7 +143,7 @@ function addBookmarkToSection(url, title, sectionName) {
 						return;
 					}
 
-					console.log('[bmextd] Bookmark saved successfully - background.js:110');
+					console.log('[bmextd] Bookmark saved successfully - background.js:146');
 					resolve();
 				});
 			} catch (error) {
@@ -123,4 +159,12 @@ function generateId() {
 
 function getFaviconUrl(url) {
 	return `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(url)}&sz=64`;
+}
+
+function normalizeUrl(url) {
+	return String(url || '').trim().toLowerCase().replace(/\/$/, '');
+}
+
+function isBookmarkableUrl(url) {
+	return /^https?:\/\//i.test(String(url || ''));
 }
