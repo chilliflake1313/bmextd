@@ -334,8 +334,8 @@ const beforeMergeCount = beforeCount;
 console.log('[bmextd] Import HANDLER: currentData at start has', beforeCount, 'bookmarks');
 console.log('[bmextd] Import HANDLER: currentData sections:', currentData?.sections?.map(s => ({ name: s.name, items: s.items?.length || 0 })));
 
-console.log('[bmextd] Import HANDLER: Calling DataUtils.importData with currentData...');
-const merged = await DataUtils.importData(file, currentData);
+console.log('[bmextd] Import HANDLER: Calling DataUtils.importData...');
+const merged = await DataUtils.importData(file);
 const importedCount = merged?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
 console.log('[bmextd] Import HANDLER: importData returned merged with', importedCount, 'total bookmarks');
 console.log('[bmextd] Import HANDLER: merged sections:', merged?.sections?.map(s => ({ name: s.name, items: s.items?.length || 0 })));

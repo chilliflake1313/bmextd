@@ -5,7 +5,20 @@ const StorageUtils = {
 		return new Promise((resolve) => {
 			chrome.storage.local.get(['bookmarksData'], (result) => {
 				if (result.bookmarksData) {
-					resolve(result.bookmarksData);
+					const data = result.bookmarksData;
+					const legacyNames = ['Life', 'Social', 'Work'];
+					const sections = Array.isArray(data.sections) ? data.sections : [];
+					const onlyLegacyEmptySections = sections.length > 0 && sections.every((section) => (
+						legacyNames.includes(section.name) && (!section.items || section.items.length === 0)
+					));
+
+					if (onlyLegacyEmptySections) {
+						data.sections = [];
+						chrome.storage.local.set({ bookmarksData: data }, () => resolve(data));
+						return;
+					}
+
+					resolve(data);
 				} else {
 					// Return default data structure
 					resolve(this.getDefaultData());
@@ -174,7 +187,7 @@ const DataUtils = {
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;
-		link.download = `doodle-bookmarks-${Date.now()}.html`;
+		link.download = `bmextd-${Date.now()}.html`;
 		link.click();
 		URL.revokeObjectURL(url);
 	},
@@ -203,8 +216,8 @@ const DataUtils = {
 
 		return `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
-<TITLE>Doodle Bookmarks</TITLE>
-<H1>Doodle Bookmarks</H1>
+<TITLE>bmextd</TITLE>
+<H1>bmextd</H1>
 <DL><p>
 ${sectionsHtml}
 </DL><p>`;
@@ -310,21 +323,92 @@ ${sectionsHtml}
 		return { sections };
 	},
 
-	// Import data from HTML bookmarks file
-	async importData(file) {
-		return new Promise((resolve, reject) => {
-			const reader = new FileReader();
-			reader.onload = (e) => {
-				try {
-					resolve(this.parseBookmarkHtml(e.target.result));
-				} catch (error) {
-					reject(error);
-				}
-			};
-			reader.onerror = () => reject(new Error('Failed to read file'));
-			reader.readAsText(file);
-		});
-	}
+mergeData(existingData, incomingData) {
+const existingSections = Array.isArray(existingData?.sections) ? existingData.sections : [];
+const incomingSections = Array.isArray(incomingData?.sections) ? incomingData.sections : [];
+const result = {
+sections: existingSections.map((section) => ({
+...section,
+items: Array.isArray(section.items) ? [...section.items] : []
+}))
+};
+
+incomingSections.forEach((newSection) => {
+if (!newSection || !newSection.name) return;
+const existingSection = result.sections.find((section) => section.name === newSection.name);
+const sourceItems = Array.isArray(newSection.items) ? newSection.items : [];
+
+if (existingSection) {
+const existingUrls = new Set(
+existingSection.items.map((item) => String(item?.url || '').trim().toLowerCase()).filter(Boolean)
+);
+sourceItems.forEach((newItem) => {
+if (!newItem || !newItem.url) return;
+const normalizedUrl = String(newItem.url).trim().toLowerCase();
+if (!normalizedUrl || existingUrls.has(normalizedUrl)) return;
+
+existingSection.items.push({
+id: newItem.id || StorageUtils.generateId(),
+label: newItem.label || newItem.url,
+url: newItem.url,
+icon: newItem.icon || this.getFaviconUrl(newItem.url),
+favorite: Boolean(newItem.favorite)
+});
+existingUrls.add(normalizedUrl);
+});
+} else {
+result.sections.push({
+...newSection,
+items: sourceItems.map((newItem) => ({
+id: newItem.id || StorageUtils.generateId(),
+label: newItem.label || newItem.url,
+url: newItem.url,
+icon: newItem.icon || this.getFaviconUrl(newItem.url),
+favorite: Boolean(newItem.favorite)
+}))
+});
+}
+});
+
+return result;
+},
+
+async getStoredDataStrict() {
+return new Promise((resolve, reject) => {
+chrome.storage.local.get(['bookmarksData'], (result) => {
+if (chrome.runtime.lastError) {
+reject(new Error(chrome.runtime.lastError.message));
+return;
+}
+
+const storedData = result.bookmarksData;
+if (!storedData || !Array.isArray(storedData.sections)) {
+resolve({ sections: [] });
+return;
+}
+
+resolve(storedData);
+});
+});
+},
+
+// Import data from HTML bookmarks file
+async importData(file) {
+return new Promise((resolve, reject) => {
+const reader = new FileReader();
+reader.onload = async (e) => {
+try {
+const importedData = this.parseBookmarkHtml(e.target.result);
+const existingData = await this.getStoredDataStrict();
+resolve(this.mergeData(existingData, importedData));
+} catch (error) {
+reject(error);
+}
+};
+reader.onerror = () => reject(new Error('Failed to read file'));
+reader.readAsText(file);
+});
+}
 };
 
 // Validation utilities
@@ -368,7 +452,7 @@ const PerformanceUtils = {
 		const start = performance.now();
 		callback();
 		const end = performance.now();
-		console.log(`${label}: ${(end - start).toFixed(2)}ms - utils.js:371`);
+		console.log(`${label}: ${(end - start).toFixed(2)}ms - utils.js:384`);
 	}
 };
 
@@ -449,4 +533,3 @@ const StatsUtils = {
 		return domains;
 	}
 };
-
