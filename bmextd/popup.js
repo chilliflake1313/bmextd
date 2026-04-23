@@ -6,10 +6,12 @@ let draggedFromSection = null;
 let draggedSectionId = null;
 let showFavoritesOnly = false;
 let popupSaveQueue = Promise.resolve();
+let bookmarkViewMode = loadBookmarkViewMode();
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
 applySavedTheme();
+syncBookmarkViewButton(bookmarkViewMode);
 await loadData();
 setupStorageSync();
 setupEventListeners();
@@ -51,6 +53,8 @@ function setupStorageSync() {
 function renderContent() {
 const searchInput = document.getElementById('searchInput');
 const query = searchInput ? searchInput.value.trim() : '';
+document.body.dataset.bookmarkView = bookmarkViewMode;
+syncBookmarkViewButton(bookmarkViewMode);
 
 if (showFavoritesOnly) {
 renderFavoritesOnly();
@@ -169,9 +173,11 @@ const faviconUrl = item.icon || DataUtils.getFaviconUrl(item.url);
 const cleanName = String(item.label || '').trim() || getSiteName(item.url);
 const fallbackLetter = DataUtils.getFirstLetter(cleanName);
 const favoriteClass = item.favorite ? 'favorite' : '';
+const viewModeClass = bookmarkViewMode === 'detailed' ? 'detailed' : 'compact';
+const displayAddress = getDisplayAddress(item.url);
 
 return `
-<div class="bookmark-item ${favoriteClass}"
+<div class="bookmark-item ${favoriteClass} ${viewModeClass}"
 draggable="true"
 data-item-id="${item.id}"
 data-section-id="${sectionId}"
@@ -179,6 +185,7 @@ title="${escapeHtml(cleanName)}\n${escapeHtml(item.url)}">
 <img src="${escapeHtml(faviconUrl)}" class="bookmark-icon" alt="">
 <span class="bookmark-fallback">${escapeHtml(fallbackLetter)}</span>
 <span class="bookmark-label">${escapeHtml(cleanName)}</span>
+${bookmarkViewMode === 'detailed' ? `<span class="bookmark-domain">${escapeHtml(displayAddress)}</span>` : ''}
 </div>
 `;
 }
@@ -243,10 +250,23 @@ return 'link';
 }
 }
 
+function getDisplayAddress(url) {
+	try {
+		return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+	} catch (error) {
+		return String(url || '')
+			.trim()
+			.replace(/^https?:\/\//i, '')
+			.replace(/^www\./i, '')
+			.split('/')[0] || 'link';
+	}
+}
+
 function setupEventListeners() {
 const searchInput = document.getElementById('searchInput');
 const searchContainer = document.getElementById('searchContainer');
 const searchToggleBtn = document.getElementById('searchToggleBtn');
+const viewModeToggleBtn = document.getElementById('viewModeToggleBtn');
 const addFolderBtn = document.getElementById('addFolderBtn');
 const favoritesToggleBtn = document.getElementById('favoritesToggleBtn');
 const themeToggleBtn = document.getElementById('themeToggleBtn');
@@ -271,6 +291,10 @@ searchInput.value = '';
 renderContent();
 }
 });
+}
+
+if (viewModeToggleBtn) {
+	viewModeToggleBtn.addEventListener('click', toggleBookmarkViewMode);
 }
 
 if (addFolderBtn) {
@@ -306,13 +330,14 @@ const file = e.target.files[0];
 if (!file) return;
 try {
 const beforeCount = currentData?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
+const beforeMergeCount = beforeCount;
 console.log('[bmextd] Import HANDLER: currentData at start has', beforeCount, 'bookmarks');
 console.log('[bmextd] Import HANDLER: currentData sections:', currentData?.sections?.map(s => ({ name: s.name, items: s.items?.length || 0 })));
 
-console.log('[bmextd] Import HANDLER: Calling DataUtils.importData...');
-const merged = await DataUtils.importData(file);
+console.log('[bmextd] Import HANDLER: Calling DataUtils.importData with currentData...');
+const merged = await DataUtils.importData(file, currentData);
 const importedCount = merged?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
-console.log('[bmextd] Import HANDLER: importData returned merged with', importedCount, 'bookmarks');
+console.log('[bmextd] Import HANDLER: importData returned merged with', importedCount, 'total bookmarks');
 console.log('[bmextd] Import HANDLER: merged sections:', merged?.sections?.map(s => ({ name: s.name, items: s.items?.length || 0 })));
 
 currentData = merged;
@@ -322,14 +347,15 @@ console.log('[bmextd] Import HANDLER: Calling saveData...');
 await saveData();
 console.log('[bmextd] Import HANDLER: saveData complete');
 
-console.log('[bmextd] Import HANDLER: Calling loadData...');
-await loadData();
-console.log('[bmextd] Import HANDLER: loadData complete');
+renderContent();
+console.log('[bmextd] Import HANDLER: renderContent complete');
 
 const afterCount = currentData?.sections?.reduce((sum, s) => sum + (s.items?.length || 0), 0) || 0;
-console.log('[bmextd] Import HANDLER: After reload, currentData has', afterCount, 'bookmarks');
+const newBookmarkCount = afterCount - beforeMergeCount;
+console.log('[bmextd] Import HANDLER: After import, currentData has', afterCount, 'total bookmarks');
+console.log('[bmextd] Import HANDLER: Added', newBookmarkCount, 'new bookmarks');
 
-alert(`Import complete: Before=${beforeCount}, After=${afterCount}, Imported=${importedCount}`);
+alert(`Import complete!\nBefore: ${beforeMergeCount} bookmarks\nAfter: ${afterCount} bookmarks\nNew: ${newBookmarkCount} bookmarks`);
 
 e.target.value = '';
 } catch (error) {
@@ -715,6 +741,32 @@ const nextTheme = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
 document.body.dataset.theme = nextTheme;
 localStorage.setItem('bmextd-theme', nextTheme);
 syncThemeButton(nextTheme);
+}
+
+function loadBookmarkViewMode() {
+	const savedMode = localStorage.getItem('bmextd-bookmark-view');
+	return savedMode === 'detailed' ? 'detailed' : 'compact';
+}
+
+function saveBookmarkViewMode(mode) {
+	localStorage.setItem('bmextd-bookmark-view', mode);
+}
+
+function toggleBookmarkViewMode() {
+	bookmarkViewMode = bookmarkViewMode === 'detailed' ? 'compact' : 'detailed';
+	saveBookmarkViewMode(bookmarkViewMode);
+	renderContent();
+}
+
+function syncBookmarkViewButton(mode) {
+	const button = document.getElementById('viewModeToggleBtn');
+	if (!button) return;
+
+	const isDetailed = mode === 'detailed';
+	button.classList.toggle('active', isDetailed);
+	button.setAttribute('aria-pressed', String(isDetailed));
+	button.title = isDetailed ? 'Switch to compact view' : 'Switch to detailed view';
+	button.setAttribute('aria-label', button.title);
 }
 
 function syncThemeButton(theme) {
