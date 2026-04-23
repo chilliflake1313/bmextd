@@ -4,6 +4,12 @@ const StorageUtils = {
 	async getData() {
 		return new Promise((resolve) => {
 			chrome.storage.local.get(['bookmarksData'], (result) => {
+				if (chrome.runtime.lastError) {
+					console.warn('Storage read failed, using empty dataset:', chrome.runtime.lastError.message);
+					resolve(this.getDefaultData());
+					return;
+				}
+
 				if (result.bookmarksData) {
 					const data = result.bookmarksData;
 					const legacyNames = ['Life', 'Social', 'Work'];
@@ -20,7 +26,6 @@ const StorageUtils = {
 
 					resolve(data);
 				} else {
-					// Return default data structure
 					resolve(this.getDefaultData());
 				}
 			});
@@ -83,8 +88,8 @@ const DataUtils = {
 		if (section) {
 			const newItem = {
 				id: StorageUtils.generateId(),
-				label: label,
-				url: url,
+				label,
+				url,
 				icon: this.getFaviconUrl(url),
 				favorite: false
 			};
@@ -132,7 +137,7 @@ const DataUtils = {
 	moveBookmark(data, itemId, fromSectionId, toSectionId) {
 		const fromSection = data.sections.find(s => s.id === fromSectionId);
 		const toSection = data.sections.find(s => s.id === toSectionId);
-    
+
 		if (fromSection && toSection) {
 			const itemIndex = fromSection.items.findIndex(i => i.id === itemId);
 			if (itemIndex !== -1) {
@@ -147,7 +152,7 @@ const DataUtils = {
 	searchBookmarks(data, query) {
 		const results = [];
 		const lowerQuery = query.toLowerCase();
-    
+
 		data.sections.forEach(section => {
 			section.items.forEach(item => {
 				if (
@@ -162,7 +167,7 @@ const DataUtils = {
 				}
 			});
 		});
-    
+
 		return results;
 	},
 
@@ -173,6 +178,29 @@ const DataUtils = {
 		} catch (e) {
 			return null;
 		}
+	},
+
+	// Get cleaned site name from a URL
+	getCleanName(url) {
+		try {
+			let host = new URL(url).hostname.toLowerCase();
+			host = host.replace(/^www\./, '');
+			const parts = host.split('.');
+
+			if (parts.length >= 2) {
+				return parts[0] || 'link';
+			}
+
+			return host || 'link';
+		} catch (error) {
+			return 'link';
+		}
+	},
+
+	// Shorten labels for compact UI rendering
+	shortName(name) {
+		const value = String(name || '').trim();
+		return value.length > 10 ? `${value.slice(0, 10)}...` : value;
 	},
 
 	// Get first letter of label
@@ -323,92 +351,96 @@ ${sectionsHtml}
 		return { sections };
 	},
 
-mergeData(existingData, incomingData) {
-const existingSections = Array.isArray(existingData?.sections) ? existingData.sections : [];
-const incomingSections = Array.isArray(incomingData?.sections) ? incomingData.sections : [];
-const result = {
-sections: existingSections.map((section) => ({
-...section,
-items: Array.isArray(section.items) ? [...section.items] : []
-}))
-};
+	mergeData(existingData, incomingData) {
+		const existingSections = Array.isArray(existingData?.sections) ? existingData.sections : [];
+		const incomingSections = Array.isArray(incomingData?.sections) ? incomingData.sections : [];
+		const result = {
+			sections: existingSections.map((section) => ({
+				...section,
+				items: Array.isArray(section.items) ? [...section.items] : []
+			}))
+		};
 
-incomingSections.forEach((newSection) => {
-if (!newSection || !newSection.name) return;
-const existingSection = result.sections.find((section) => section.name === newSection.name);
-const sourceItems = Array.isArray(newSection.items) ? newSection.items : [];
+		incomingSections.forEach((newSection) => {
+			if (!newSection || !newSection.name) return;
 
-if (existingSection) {
-const existingUrls = new Set(
-existingSection.items.map((item) => String(item?.url || '').trim().toLowerCase()).filter(Boolean)
-);
-sourceItems.forEach((newItem) => {
-if (!newItem || !newItem.url) return;
-const normalizedUrl = String(newItem.url).trim().toLowerCase();
-if (!normalizedUrl || existingUrls.has(normalizedUrl)) return;
+			const existingSection = result.sections.find((section) => section.name === newSection.name);
+			const sourceItems = Array.isArray(newSection.items) ? newSection.items : [];
 
-existingSection.items.push({
-id: newItem.id || StorageUtils.generateId(),
-label: newItem.label || newItem.url,
-url: newItem.url,
-icon: newItem.icon || this.getFaviconUrl(newItem.url),
-favorite: Boolean(newItem.favorite)
-});
-existingUrls.add(normalizedUrl);
-});
-} else {
-result.sections.push({
-...newSection,
-items: sourceItems.map((newItem) => ({
-id: newItem.id || StorageUtils.generateId(),
-label: newItem.label || newItem.url,
-url: newItem.url,
-icon: newItem.icon || this.getFaviconUrl(newItem.url),
-favorite: Boolean(newItem.favorite)
-}))
-});
-}
-});
+			if (existingSection) {
+				const existingUrls = new Set(
+					existingSection.items
+						.map((item) => String(item?.url || '').trim().toLowerCase())
+						.filter(Boolean)
+				);
 
-return result;
-},
+				sourceItems.forEach((newItem) => {
+					if (!newItem || !newItem.url) return;
+					const normalizedUrl = String(newItem.url).trim().toLowerCase();
+					if (!normalizedUrl || existingUrls.has(normalizedUrl)) return;
 
-async getStoredDataStrict() {
-return new Promise((resolve, reject) => {
-chrome.storage.local.get(['bookmarksData'], (result) => {
-if (chrome.runtime.lastError) {
-reject(new Error(chrome.runtime.lastError.message));
-return;
-}
+					existingSection.items.push({
+						id: newItem.id || StorageUtils.generateId(),
+						label: newItem.label || newItem.url,
+						url: newItem.url,
+						icon: newItem.icon || this.getFaviconUrl(newItem.url),
+						favorite: Boolean(newItem.favorite)
+					});
+					existingUrls.add(normalizedUrl);
+				});
+			} else {
+				result.sections.push({
+					...newSection,
+					items: sourceItems.map((newItem) => ({
+						id: newItem.id || StorageUtils.generateId(),
+						label: newItem.label || newItem.url,
+						url: newItem.url,
+						icon: newItem.icon || this.getFaviconUrl(newItem.url),
+						favorite: Boolean(newItem.favorite)
+					}))
+				});
+			}
+		});
 
-const storedData = result.bookmarksData;
-if (!storedData || !Array.isArray(storedData.sections)) {
-resolve({ sections: [] });
-return;
-}
+		return result;
+	},
 
-resolve(storedData);
-});
-});
-},
+	async getStoredDataStrict() {
+		return new Promise((resolve, reject) => {
+			chrome.storage.local.get(['bookmarksData'], (result) => {
+				if (chrome.runtime.lastError) {
+					reject(new Error(chrome.runtime.lastError.message));
+					return;
+				}
 
-// Import data from HTML bookmarks file
-async importData(file) {
-return new Promise((resolve, reject) => {
-const reader = new FileReader();
-reader.onload = async (e) => {
-try {
-const importedData = this.parseBookmarkHtml(e.target.result);
-const existingData = await this.getStoredDataStrict();
-resolve(this.mergeData(existingData, importedData));
-} catch (error) {
-reject(error);
-}
-};
-reader.onerror = () => reject(new Error('Failed to read file'));
-reader.readAsText(file);
-});
-}
+				const storedData = result.bookmarksData;
+				if (!storedData || !Array.isArray(storedData.sections)) {
+					resolve({ sections: [] });
+					return;
+				}
+
+				resolve(storedData);
+			});
+		});
+	},
+
+	// Import data from HTML bookmarks file and merge into existing bookmarks
+	async importData(file) {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = async (e) => {
+				try {
+					const importedData = this.parseBookmarkHtml(e.target.result);
+					const existingData = await this.getStoredDataStrict();
+					resolve(this.mergeData(existingData, importedData));
+				} catch (error) {
+					reject(error);
+				}
+			};
+			reader.onerror = () => reject(new Error('Failed to read file'));
+			reader.readAsText(file);
+		});
+	}
 };
 
 // Validation utilities
@@ -452,7 +484,7 @@ const PerformanceUtils = {
 		const start = performance.now();
 		callback();
 		const end = performance.now();
-		console.log(`${label}: ${(end - start).toFixed(2)}ms - utils.js:384`);
+		console.log(`${label}: ${(end - start).toFixed(2)}ms`);
 	}
 };
 
