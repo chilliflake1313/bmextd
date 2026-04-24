@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Balsamiq+Sans:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600&display=swap');
 
 :root {
 	--ui-scale: 0.5;
@@ -48,7 +48,7 @@ body {
 body {
 	width: min(620px, 100vw);
 	height: 100vh;
-	font-family: 'Balsamiq Sans', 'Segoe UI', 'Trebuchet MS', sans-serif;
+	font-family: 'Nunito', 'Segoe UI', 'Trebuchet MS', sans-serif;
 	background: var(--page-bg);
 	color: var(--text-color);
 	overflow: hidden;
@@ -98,7 +98,7 @@ input {
 .title {
 	font-size: calc(44px * var(--ui-scale));
 	line-height: 1;
-	font-weight: 700;
+	font-weight: 600;
 	letter-spacing: 0.2px;
 	color: var(--text-color);
 }
@@ -208,7 +208,7 @@ input {
 .section-title {
 	font-size: calc(38px * var(--ui-scale));
 	line-height: 1;
-	font-weight: 700;
+	font-weight: 600;
 	color: var(--text-color);
 }
 
@@ -338,7 +338,7 @@ body[data-bookmark-view='detailed'] .bookmarks-grid {
 	align-items: center;
 	justify-content: center;
 	font-size: calc(11px * var(--ui-scale));
-	font-weight: 700;
+	font-weight: 600;
 	background: var(--border-color);
 }
 
@@ -362,7 +362,7 @@ body[data-bookmark-view='detailed'] .bookmarks-grid {
 	text-overflow: ellipsis;
 	line-height: 1.1;
 	font-size: 11px;
-	font-weight: 700;
+	font-weight: 600;
 }
 
 .bookmark-domain {
@@ -380,7 +380,7 @@ body[data-bookmark-view='detailed'] .bookmarks-grid {
 
 .bookmark-item.detailed .bookmark-domain {
 	display: block;
-	font-family: 'Balsamiq Sans', 'Segoe UI', 'Trebuchet MS', sans-serif;
+	font-family: 'Nunito', 'Segoe UI', 'Trebuchet MS', sans-serif;
 }
 
 .bookmark-item.detailed:hover {
